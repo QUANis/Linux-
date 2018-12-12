@@ -1,0 +1,106 @@
+服务器上设置线下管理员账户时间
+useradd tom
+
+账户设置有效时间
+chage -E 2018-11-11 tom
+
+chage -l tom
+最近一次密码修改时间					：11月 11, 2018
+密码过期时间					：从不
+密码失效时间					：从不
+帐户过期时间						：从不
+两次改变密码之间相距的最小天数		：0
+两次改变密码之间相距的最大天数		：99999
+在密码过期之前警告的天数	：
+
+定义默认有效期
+/etc/login.defs 参数
+PASS_MAX_DAYS    99999           //密码最长有效期
+PASS_MIN_DAYS    0              //密码最短有效期
+PASS_MIN_LEN     5             //密码最短长度
+PASS_WARN_AGE    7            //密码快过期前几天提示警告信息
+UID_MIN          1000        //UID最小值
+UID_MAX          60000      //UID最大值
+
+临时锁定用户账户使其无法登陆
+
+passwd -l tom 
+锁定用户 tom 的密码 。
+passwd: 操作成功
+
+查看临时锁定的账户
+passwd -S tom
+tom LK 2018-11-11 0 99999 7 -1 (密码已被锁定。)
+
+解锁临时用户
+passwd -u tom
+解锁用户 tom 的密码。
+passwd: 操作成功
+
+修该tty信息隐藏版本号
+/etc/issue
+里边改为什么都可以
+
+对于操作系统来说，文件系统也可以通过添加额外属性来提高性能与安全性
+noexec属性可以让分区下的所有程序都不可执行，包括病毒与木马
+noatime让分区下的所有文件都不再更新atime时间，atime时间为文件的访问时间
+vim /etc/fstab
+/dev/vda1   /boot    xfs   defaults,noexec   0  0
+/dev/vda3   /home    xfs   defaults,noatime  0  0
+
+锁定文件把重要的文件给锁定者无法删除或修改
+chattr +i  /etc/resolv.conf   //锁定
+chattr -i /etc/resolv.conf   //解锁定
+给文件锁定后只可以往里追加还必须要echo >>
+chattr +a /etc/hosts   //加锁只可以追加
+chattr-a /etc/hosts   //解锁追加
+
+查看所加的文件的特性选项
+lsattr /etc/resolv.conf 
+----ia-------e-- /etc/resolv.conf
+
+使用sudo分配管理权限
+
+从普通用户切换为root账户身份(只需要管理root密码就可以完成操作）
+whoami 的结果是tmo
+然后su -           //回车管理员root密码)
+whoami 的结果是root
+
+tom用su命令栽赃嫁祸dc用户(必须要有dc的密码）
+su - test3 -c "touch /root/4.txt"
+
+包含起服务也可以
+su --c "systemctl restart nginx"
+
+允许tom管理系统服务的权限
+vim /etc/sudoers            //修改文件后，需要使用wq!强制保存
+tom    ALL=(ALL)   /usr/bin/systemct
+//授权softadm以root身份执行systemctl命令（ALL包括root）
+su - tom
+systemctl restart httpd   起服务无限
+sudo systemctl restart httpd 通过sudo启动服务成功
+在输入自己密码
+sudo 可以分配到公司个个部门应用不一样如给用户该密码网络服务管理    （相关操作man sudoers)
+
+为sudo机制启用日志记录，以便跟踪sudo执行操作 默认启动
+Defaults  logfile="/var/log/sudo
+
+提高SSH服务安全
+配置基本安全策略（禁止root、禁止空口令） {禁止root登陆一定要给自己留后门 (usermod -a -G wheel tom)}
+针对SSH访问采用仅允许的策略，未明确列出的用户一概拒绝登录
+实现密钥验证登录（私钥口令）、免密码登入
+确认密钥验证使用正常后，禁用口令验证
+vim /etc/ssh/sshd_config
+Protocol 2                                          //SSH协议
+PermitRootLogin no                                 //禁止root用户登录
+PermitEmptyPasswords no                           //禁止密码为空的用户登录
+UseDNS  no                                       //不解析客户机地址
+LoginGraceTime  1m                              //登录限时
+MaxAuthTries  3                                //每连接最多认证次数
+从起服务
+systemctl restart sshd
+
+针对SSH访问采用仅允许的策略，未明确列出的用户一概拒绝登录
+DenyUsers  dc(用户）        //定义账户黑名单
+AllowGroups tom (用户）    //定义组白名单
+ systemctl restart sshd
